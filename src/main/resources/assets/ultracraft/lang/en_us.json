@@ -49,7 +49,7 @@
   "entity.ultracraft.shotgun_pellet": "Shotgun Pellet",
   "entity.ultracraft.ejected_core": "Ejected Core",
 
-  "death.attack.shockwave": "%1$s got crushed by a shockwave caused by %2$s",
+  "death.attack.shockwave": "%s got crushed by a shockwave",
   "death.attack.shockwave.item": "%1$s got crushed by a shockwave caused by %2$s",
   "death.attack.maurice": "%1$s was mauriced",
   "death.attack.maurice.player": "%1$s was mauriced while distracted by %2$s",
@@ -82,6 +82,10 @@
   "message.ultracraft.hi-vel.enable": "High Velocity Wings activated!",
   "message.ultracraft.hi-vel.disable": "High Velocity Wings deactivated!",
   "message.ultracraft.server.freeze-enable-warning": "[§4Ultracraft§r] h-hey, you just enabled the freeze effect! Please be aware that this effect is §4SERVER-WIDE§r, so any time-freeze affects EVERYONE. If you have many players, please consider leaving this turned off.",
+  "message.ultracraft.server.projboost-all": "[§4Ultracraft§r] All Projectiles can now be Projectile boosted. This includes Arrows, Tridents, enderpearls and even Rockets",
+  "message.ultracraft.server.projboost-limited": "[§4Ultracraft§r] Only Shotgun Primary Fire can now be Projectile Boosted.",
+  "message.ultracraft.server.projboost-tag": "[§4Ultracraft§r] Only Projectiles in the \"projboostable\" entity tag can now be Projectile boosted. (customize via datapack)",
+  "message.ultracraft.server.projboost-disable": "[§4Ultracraft§r] Projectile Boosts have been entirely disabled.",
   "message.ultracraft.fish.caught": "Caught %s!",
   "message.ultracraft.fish.size": "Size: %s",
   "message.ultracraft.fish.disable": "You can disable this joke in the mod config",
@@ -91,7 +95,7 @@
   "message.ultracraft.fish.mania4": "THE SIZE 2 IS REAL!!",
   "message.ultracraft.fish.mania5": "...that's... \nthat's bigger than usual! \nI have to be getting close!!",
   "message.ultracraft.handswap-disabled": "[§4Ultracraft§r] This Server has disabled hand quick-swapping.",
-  "message.ultracraft.content": "Welcome to Ultracraft!\nThis Mod aims to recreate the game Ultrakill (by §6Arsi \"Hakita\" Patala§f) and its mechanics in Minecraft. The Current Content includes:\n- All Prologue Enemies\n- 2 Weapons\n- A few Blocks and Items\n- A few Secrets/Jokes\n\nIf enough people like it, I will keep working on the mod. The next Feature I would implement, is §6Style Points§f.\nPlease be sure to report Issues/Bugs and send any Feedback you have my way!\nRelevant Links are in the Mod Info.\n\n✦ Absolutelyaya ✦",
+  "message.ultracraft.content": "Welcome to Ultracraft!\nThis Mod aims to recreate the game Ultrakill (by §6Arsi \"Hakita\" Patala§f) and its mechanics in Minecraft. The Current Content includes:\n- All Prologue Enemies\n- 2 Weapons\n- A few Blocks and Items\n- A few Secrets/Jokes\n\nIf enough people like it, I will keep working on the mod. The next noteworthy Update will be §6Weapon Variants§f.\nPlease be sure to report Issues/Bugs and send any Feedback you have my way!\nRelevant Links are in the Mod Info.\n\n✦ Absolutelyaya ✦",
   "message.ultracraft.consent": "Understood",
   "message.ultracraft.intro-error": "Something went wrong with the Ultracraft intro sequence.\nThe issue: Sometimes detecting the asset reload being finished doesn't work.\nLuckily, we have a button that can solve any problem!",
   "message.ultracraft.fixer-button": "Fix that",
@@ -114,6 +118,7 @@
   "yaya.support.kofi": "Support yayas endeavours",
 
   "text.autoconfig.ultracraft.category.default": "Ultracraft",
+  "text.autoconfig.ultracraft.category.ultra-hud": "UltraHUD",
   "text.autoconfig.ultracraft.category.blood": "Goop / Blood",
   "text.autoconfig.ultracraft.category.debug": "Debug",
 
@@ -137,11 +142,14 @@
   "text.autoconfig.ultracraft.option.ultraHudVisibility.@Tooltip[0]": "Whether the UltraHUD should be rendered.",
   "text.autoconfig.ultracraft.option.ultraHudVisibility.@Tooltip[1]": "LIMITED = only show when in Hi-Velocity Mode",
 
-  "text.autoconfig.ultracraft.option.ultraHudCrosshair": "UltraHUD Crosshair meters",
+  "text.autoconfig.ultracraft.option.ultraHudCrosshair": "Crosshair meters",
   "text.autoconfig.ultracraft.option.ultraHudCrosshair.@Tooltip": "Adds Health and Energy bars around your Crosshair.",
 
-  "text.autoconfig.ultracraft.option.moveUltrahud": "Move Ultrahud",
-  "text.autoconfig.ultracraft.option.moveUltrahud.@Tooltip": "Moves the UltraHUD up when holding an item in your offhand.",
+  "text.autoconfig.ultracraft.option.moveUltrahud": "Move",
+  "text.autoconfig.ultracraft.option.moveUltrahud.@Tooltip": "Moves the UltraHUD up when holding an item that would cover it.",
+
+  "text.autoconfig.ultracraft.option.switchSides": "Flip Sides",
+  "text.autoconfig.ultracraft.option.switchSides.@Tooltip": "Moves the UltraHUD to the other side of the screen.",
 
   "text.autoconfig.ultracraft.option.maxTrails": "Maximum Trails",
   "text.autoconfig.ultracraft.option.maxTrails.@Tooltip": "Caps the amount of Trails at this amount.",
@@ -152,6 +160,9 @@
   "text.autoconfig.ultracraft.option.slideCamOffset": "Slide Camera Offset Percent",
   "text.autoconfig.ultracraft.option.slideCamOffset.@Tooltip": "How much the third person camera is moved while sliding.",
 
+  "text.autoconfig.ultracraft.option.slideTilt": "Slide Camera Tilting Angle",
+  "text.autoconfig.ultracraft.option.slideTilt.@Tooltip": "How much the camera should tilt when steering a slide sideways.",
+
   "text.autoconfig.ultracraft.option.trailParticles": "Trails as particles",
   "text.autoconfig.ultracraft.option.trailParticles.@Tooltip[0]": "Renders Trails using particles instead of the Trail renderer.",
   "text.autoconfig.ultracraft.option.trailParticles.@Tooltip[1]": "Disabling this will currently lead to Transparency Layering issues!",
@@ -161,6 +172,12 @@
 
   "text.autoconfig.ultracraft.option.danganronpa": "Censor Blood",
   "text.autoconfig.ultracraft.option.danganronpa.@Tooltip": "Replaces Blood VFX colors with neon Pink.",
+
+  "text.autoconfig.ultracraft.option.showPunchArea": "Show Punch Area",
+  "text.autoconfig.ultracraft.option.showPunchArea.@Tooltip": "Spawns particles in the corners of the punch area.",
+
+  "text.autoconfig.ultracraft.option.movementSounds": "Movement Sounds",
+  "text.autoconfig.ultracraft.option.movementSounds.@Tooltip": "Whether Sliding and quick movement should play their sound loops.",
 
   "text.autoconfig.ultracraft.option.repeatIntro": "Repeat Intro"
 }

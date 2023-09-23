@@ -15,14 +15,21 @@ public class Ultraconfig implements ConfigData
 	public boolean serverJoinInfo = true;
 	@ConfigEntry.Gui.Tooltip(count = 2)
 	public boolean freezeVFX = true;
+	@ConfigEntry.Category("ultra-hud")
 	@ConfigEntry.Gui.Tooltip
 	public boolean fishingJoke = true;
+	@ConfigEntry.Category("ultra-hud")
 	@ConfigEntry.Gui.Tooltip(count = 2)
 	public UltraHudRenderer.UltraHudVisibility ultraHudVisibility = UltraHudRenderer.UltraHudVisibility.ALWAYS;
+	@ConfigEntry.Category("ultra-hud")
 	@ConfigEntry.Gui.Tooltip
 	public boolean ultraHudCrosshair = true;
+	@ConfigEntry.Category("ultra-hud")
 	@ConfigEntry.Gui.Tooltip
 	public boolean moveUltrahud = true;
+	@ConfigEntry.Category("ultra-hud")
+	@ConfigEntry.Gui.Tooltip
+	public boolean switchSides = false;
 	@ConfigEntry.Gui.Tooltip
 	@ConfigEntry.BoundedDiscrete(min = 16, max = 128)
 	public int maxTrails = 64;
@@ -31,6 +38,11 @@ public class Ultraconfig implements ConfigData
 	@ConfigEntry.Gui.Tooltip
 	@ConfigEntry.BoundedDiscrete(min = 0, max = 100)
 	public int slideCamOffset = 100;
+	@ConfigEntry.Gui.Tooltip
+	@ConfigEntry.BoundedDiscrete(min = 0, max = 45)
+	public int slideTilt = 4;
+	@ConfigEntry.Gui.Tooltip
+	public boolean movementSounds = true;
 	@ConfigEntry.Category("blood")
 	@ConfigEntry.Gui.Tooltip
 	public boolean fancyGoop = false;
@@ -42,12 +54,15 @@ public class Ultraconfig implements ConfigData
 	public boolean bloodOverlay = true;
 	@ConfigEntry.Category("blood")
 	@ConfigEntry.Gui.Tooltip
-	public boolean danganronpa = true;
+	public boolean danganronpa = false;
 	@ConfigEntry.Gui.Excluded
 	public String BGID = "ultracraft";
 	@ConfigEntry.Category("debug")
 	@ConfigEntry.Gui.Tooltip
 	public boolean trailLines = false;
+	@ConfigEntry.Category("debug")
+	@ConfigEntry.Gui.Tooltip
+	public boolean showPunchArea = false;
 	public boolean repeatIntro = false;
 	
 	@ConfigEntry.Gui.Excluded

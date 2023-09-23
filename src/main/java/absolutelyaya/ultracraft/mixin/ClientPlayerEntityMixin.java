@@ -1,8 +1,9 @@
 package absolutelyaya.ultracraft.mixin;
 
+import absolutelyaya.ultracraft.Ultracraft;
 import absolutelyaya.ultracraft.accessor.WingedPlayerEntity;
 import absolutelyaya.ultracraft.client.UltracraftClient;
-import absolutelyaya.ultracraft.registry.BlockTagRegistry;
+import absolutelyaya.ultracraft.registry.TagRegistry;
 import absolutelyaya.ultracraft.registry.PacketRegistry;
 import com.mojang.authlib.GameProfile;
 import io.netty.buffer.Unpooled;
@@ -18,13 +19,12 @@ import net.minecraft.client.world.ClientWorld;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.fluid.Fluids;
 import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.packet.c2s.play.ClientCommandC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.Vec3i;
+import net.minecraft.util.math.*;
 import net.minecraft.util.shape.VoxelShape;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -70,33 +70,25 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
 	
 	@Shadow public abstract boolean isSubmergedInWater();
 	
+	@Shadow public abstract void playSound(SoundEvent event, SoundCategory category, float volume, float pitch);
+	
 	Vec3d dashDir = Vec3d.ZERO;
 	Vec3d slideDir = Vec3d.ZERO;
-	boolean groundPounding, lastGroundPounding, lastJumping, lastSprintPressed, lastTouchedWater, wasHiVel, slamStored;
-	int groundPoundTicks, ticksSinceLastGroundPound = -1, slideTicks, wallJumps = 3, coyote;
+	boolean slamming, lastSlamming, strongGroundPound, lastJumping, lastSprintPressed, lastTouchedWater, wasHiVel, slamStored, slideStartedSideways;
+	int slamTicks, slamCooldown, slamJumpTimer = -1, slideTicks, wallJumps = 3, coyote, disableJumpTicks;
 	float slideVelocity;
 	final float baseJumpVel = 0.42f;
 	
-	@Inject(method = "sendMovementPackets", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/ClientPlayNetworkHandler;sendPacket(Lnet/minecraft/network/packet/Packet;)V", ordinal = 0), cancellable = true)
-	public void onSendSneakChangedPacket(CallbackInfo ci)
-	{
-		if(tryDash(this))
-		{
-			lastSneaking = isSneaking();
-			ci.cancel();
-		}
-	}
-	
-	boolean tryDash(WingedPlayerEntity winged)
+	void tryDash()
 	{
 		if(UltracraftClient.isHiVelEnabled() && !getAbilities().flying)
 		{
-			if(isSneaking() && !lastSneaking && !winged.isDashing())
+			if(isSneaking() && !lastSneaking)
 			{
-				if(!winged.consumeStamina())
-					return true;
-				if(groundPounding)
-					groundPounding = false;
+				if(!consumeStamina())
+					return;
+				if(slamming)
+					slamming = false;
 				if(slamStored)
 					slamStored = false;
 				Vec3d dir = new Vec3d(input.movementSideways, 0f, input.movementForward).rotateY(-(float)Math.toRadians(getYaw())).normalize();
@@ -110,31 +102,33 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
 				ClientPlayNetworking.send(PacketRegistry.DASH_C2S_PACKET_ID, buf);
 				setVelocity(dir);
 				dashDir = dir;
-				winged.onDash();
+				onDash();
 				playSound(SoundEvents.ENTITY_ENDER_DRAGON_FLAP, SoundCategory.PLAYERS, 0.5f, 1.6f);
-				return true;
 			}
 		}
-		return false;
 	}
 	
 	@Inject(method = "sendMovementPackets", at = @At(value = "HEAD"), cancellable = true)
 	public void onSendMovementPackets(CallbackInfo ci)
 	{
-		if(UltracraftClient.isHiVelEnabled() && !getAbilities().flying)
+		if(UltracraftClient.isHiVelEnabled() && !getAbilities().flying && !isSpectator())
 		{
+			if(slamCooldown > 0)
+				slamCooldown--;
 			if(wasHiVel != UltracraftClient.isHiVelEnabled() && lastSprintPressed)
 				setSliding(true, false); //when switching into HiVelMode while sprinting, reinitiate sliding
-			if(ticksSinceLastGroundPound > -1 && ticksSinceLastGroundPound < 4)
-				ticksSinceLastGroundPound++;
+			if(slamJumpTimer > -1 && slamJumpTimer < 4)
+				slamJumpTimer++;
 			//start slide or groundpound
-			if(client.options.sprintKey.isPressed() && !lastSprintPressed && !groundPounding)
+			if(client.options.sprintKey.isPressed() && !lastSprintPressed && !slamming)
 			{
 				//start ground pound
-				if(isUnSolid(posToBlock(getPos().subtract(0f, 0.99f, 0f))) && !verticalCollision)
+				if(isUnSolid(posToBlock(getPos().subtract(0f, 0.99f, 0f))) && !verticalCollision && slamCooldown == 0)
 				{
-					groundPoundTicks = 0;
-					groundPounding = true;
+					cancelDash();
+					slamTicks = 0;
+					slamming = true;
+					strongGroundPound = true;
 					setSprinting(false);
 				}
 				//start slide
@@ -149,6 +143,9 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
 					setSprinting(false);
 				ci.cancel();
 			}
+			//cancel strong groundpound if key is let go during it
+			if(strongGroundPound && !client.options.sprintKey.isPressed())
+				strongGroundPound = false;
 			//stop sliding once conditions aren't met anymore
 			else if(isSprinting())
 			{
@@ -158,8 +155,8 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
 					addVelocity(0, baseJumpVel, 0);
 					setIgnoreSlowdown(true); //don't slow down from air friction during movement tech
 				}
-				boolean moved = new Vec3d(lastX, lastBaseY, lastZ).distanceTo(getPos()) > slideVelocity / 2f;
-				setSprinting(client.options.sprintKey.isPressed() && !groundPounding && moved && !jumping);
+				boolean moved = new Vec3d(lastX, lastBaseY, lastZ).distanceTo(getPos()) > slideVelocity / 2f || Ultracraft.isTimeFrozen() || slideTicks < 1;
+				setSprinting(client.options.sprintKey.isPressed() && !slamming && moved && !jumping);
 				slideTicks++;
 				if(isUnSolid(posToBlock(getPos().subtract(0f, 0.25f, 0f))))
 					slideTicks = 0;
@@ -173,39 +170,58 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
 				setVelocity(slideDir.multiply(1f + 0.2 * UltracraftClient.speed).multiply(slideVelocity / 1.5f).add(0f, getVelocity().y, 0f));
 				ci.cancel();
 			}
-			//skip on liquids
+			//skim on liquids
 			BlockPos belowPos = posToBlock(getPos().subtract(0f, 0.1f, 0f));
 			FluidState fluidBelow = world.getBlockState(belowPos).getFluidState();
-			if(isSprinting() && !fluidBelow.getFluid().equals(Fluids.EMPTY) && !fluidBelow.isIn(BlockTagRegistry.UNSKIPPABLE_FLUIDS)
+			if(isSprinting() && !fluidBelow.getFluid().equals(Fluids.EMPTY) && !fluidBelow.isIn(TagRegistry.UNSKIMMABLE_FLUIDS)
 					   && world.getFluidState(belowPos.up()).getFluid().equals(Fluids.EMPTY))
 			{
 				Vec3d vel = getVelocity();
 				setVelocity(new Vec3d(vel.x, Math.max(baseJumpVel / 2f, vel.y * -0.75), vel.z));
+				PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
+				buf.writeVector3f(getPos().toVector3f());
+				ClientPlayNetworking.send(PacketRegistry.SKIM_C2S_PACKET_ID, buf);
 			}
 			//ground pound velocity
-			if(groundPounding)
+			if(slamming)
 			{
-				groundPoundTicks++;
+				slamTicks++;
 				if(!slamStored)
 					setVelocity(0, -2, 0);
 				//landing
 				if(verticalCollision && getVelocity().y < 0f)
 				{
-					groundPounding = false;
-					ticksSinceLastGroundPound = 0;
+					slamming = false;
+					slamJumpTimer = 0;
+					slamCooldown = 5;
 				}
+				if(jumping && lastJumping)
+					disableJumpTicks = 8;
 				ci.cancel();
 			}
 			//high jump after ground pound
-			if(ticksSinceLastGroundPound > -1 && ticksSinceLastGroundPound < 4 && jumping && !lastJumping)
+			if(jumping && !lastJumping)
 			{
-				ticksSinceLastGroundPound = -1;
-				if(client.options.sprintKey.isPressed() && slamStored) //Ultradive
-					setVelocity(Vec3d.fromPolar(0, getYaw()).multiply(3f).add(0, getJumpVelocity(), 0));
-				else
-					setVelocity(0, groundPoundTicks / 20f + getJumpVelocity() * 1.5f + (slamStored ? 3f : 0f), 0);
+				if(slamJumpTimer > -1 && slamJumpTimer < 4)
+				{
+					slamJumpTimer = -1;
+					if(client.options.sprintKey.isPressed() && !strongGroundPound) //Dive / Ultradive
+					{
+						setIgnoreSlowdown(true);
+						setVelocity(Vec3d.fromPolar(0, getYaw()).multiply(slamStored ? 4f : 1.5f).add(0, getJumpVelocity(), 0));
+					}
+					else
+						setVelocity(0, slamTicks / 20f + getJumpVelocity() * 1.5f + (slamStored ? 3f : 0f), 0);
+					slamStored = false;
+					slamTicks = 0;
+					ci.cancel();
+				}
 				slamStored = false;
-				groundPoundTicks = 0;
+			}
+			//start dash
+			if(isSneaking() && !lastSneaking)
+			{
+				tryDash();
 				ci.cancel();
 			}
 			//dash velocity
@@ -246,6 +262,8 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
 				if(!isUnSolid(posToBlock(getPos().subtract(0f, 0.1f, 0f))))
 					coyote = 4;
 				wallJumps = 3;
+				if(slamming)
+					slamming = false;
 			}
 			if((!onGround || isUnSolid(posToBlock(getPos().subtract(0f, 0.1f, 0f)))) && coyote > 0)
 				coyote--;
@@ -254,7 +272,7 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
 			ArrayList<VoxelShape> touchingWalls = new ArrayList<>(StreamSupport.stream(temp.spliterator(), false).toList());
 			temp = world.getBlockCollisions(this, getBoundingBox().expand(0f, 0, 0.1f));
 			touchingWalls.addAll(StreamSupport.stream(temp.spliterator(), false).toList());
-			if(!groundPounding && !isSprinting() && touchingWalls.size() > 0 && isUnSolid(posToBlock(getPos().subtract(0f, 0.2f, 0f))))
+			if(!slamming && !isSprinting() && touchingWalls.size() > 0 && isUnSolid(posToBlock(getPos().subtract(0f, 0.2f, 0f))))
 			{
 				Vec3d vel = getVelocity();
 				setVelocity(new Vec3d(vel.x, Math.max(vel.y, -0.2), vel.z));
@@ -262,7 +280,7 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
 			}
 			//wall jump
 			if(wallJumps > 0 && isUnSolid(posToBlock(getPos().subtract(0f, 0.5f, 0f))) &&
-					   jumping && !lastJumping && !lastOnGround && touchingWalls.size() > 0 && (UltracraftClient.isSlamStorageEnabled() || !groundPounding) &&
+					   jumping && !lastJumping && !lastOnGround && touchingWalls.size() > 0 && (UltracraftClient.isSlamStorageEnabled() || !slamming) &&
 					   !isSprinting())
 			{
 				Vec3d vel = new Vec3d(0, 0, 0);
@@ -287,9 +305,11 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
 				vel = new Vec3d(MathHelper.clamp(vel.x, -1f, 1f), 0, MathHelper.clamp(vel.z, -1f, 1f));
 				setVelocity(vel.normalize().multiply(0.33));
 				addVelocity(0f, getJumpVelocity(), 0f);
-				if(groundPounding && UltracraftClient.isSlamStorageEnabled())
+				if(slamming && UltracraftClient.isSlamStorageEnabled())
 					slamStored = true;
-				wallJumps--;
+				if(!isCreative())
+					wallJumps--;
+				setIgnoreSlowdown(false);
 				ci.cancel();
 			}
 			//update movement data
@@ -303,34 +323,48 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
 				lastYaw = getYaw();
 				autoJumpEnabled = client.options.getAutoJump().getValue();
 				lastTouchedWater = world.getBlockState(posToBlock(getPos().subtract(0f, 0.1, 0f))).getBlock() instanceof FluidBlock;
-				if(lastGroundPounding != groundPounding)
+				if(lastSlamming != slamming)
 				{
-					boolean strong = client.options.sprintKey.isPressed() && !groundPounding && consumeStamina();
+					boolean strong = strongGroundPound && !slamming && consumeStamina();
 					PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
-					buf.writeBoolean(groundPounding);
+					buf.writeBoolean(slamming);
 					buf.writeBoolean(strong);
 					ClientPlayNetworking.send(PacketRegistry.GROUND_POUND_C2S_PACKET_ID, buf);
-					if(groundPounding)
-						startGroundPound();
+					if(slamming)
+						startSlam();
 					else
-						completeGroundPound(strong);
+						endSlam(strong);
 				}
-				lastGroundPounding = groundPounding;
+				lastSlamming = slamming;
 			}
 			if(isSprinting() && slideVelocity > 0.33f && slideTicks > 50)
 				slideVelocity = Math.max(0.33f, slideVelocity * 0.995f);
 			lastSprintPressed = client.options.sprintKey.isPressed() && !isDashing() && !wasDashing(2);
 			lastJumping = jumping;
 			lastOnGround = onGround;
+			if(lastSneaking != isSneaking())
+				networkHandler.sendPacket(new ClientCommandC2SPacket(this,
+						isSneaking() ? ClientCommandC2SPacket.Mode.PRESS_SHIFT_KEY : ClientCommandC2SPacket.Mode.RELEASE_SHIFT_KEY));
+			lastSneaking = isSneaking();
 		}
 		else
 		{
 			if (shouldIgnoreSlowdown())
 				setIgnoreSlowdown(false);
-			if(!wasHiVel && UltracraftClient.isHiVelEnabled() && getAbilities().flying && isSprinting())
+			if((!wasHiVel && UltracraftClient.isHiVelEnabled() || (getAbilities().flying || isSpectator())) && isSprinting())
 				setSliding(false, true);
+			if(slamming)
+				cancelGroundPound();
 		}
 		wasHiVel = UltracraftClient.isHiVelEnabled();
+	}
+	
+	@Inject(method = "tickNewAi", at = @At("RETURN"))
+	void onTickAI(CallbackInfo ci)
+	{
+		jumping = jumping && disableJumpTicks == 0;
+		if(disableJumpTicks > 0)
+			disableJumpTicks--;
 	}
 	
 	Vec3d unhorizontalize(Vec3d in)
@@ -338,11 +372,28 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
 		return Math.abs(in.x) > Math.abs(in.z) ? new Vec3d(in.x > 0f ? 1f : -1f, 0f, 0f) : new Vec3d(0f, 0f, in.z > 0f ? 1f : -1f);
 	}
 	
+	void cancelGroundPound()
+	{
+		slamming = lastSlamming = false;
+		PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
+		buf.writeBoolean(slamming);
+		buf.writeBoolean(false);
+		ClientPlayNetworking.send(PacketRegistry.GROUND_POUND_C2S_PACKET_ID, buf);
+		endSlam(false);
+	}
+	
 	void setSliding(boolean sliding, boolean last)
 	{
 		this.setFlag(3, sliding); //sprinting flag
 		if(sliding && !last)
-			slideDir = Vec3d.fromPolar(0f, getYaw()).normalize();
+		{
+			Vec2f movementDir = input.getMovementInput();
+			slideStartedSideways = movementDir.x != 0f;
+			if(movementDir.lengthSquared() == 0)
+				slideDir = Vec3d.fromPolar(0f, getYaw()).normalize();
+			else
+				slideDir = new Vec3d(movementDir.x, 0, movementDir.y).rotateY((float)Math.toRadians(-getRotationClient().y)).normalize();
+		}
 		slideVelocity = Math.max(0.33f, (float)getVelocity().multiply(1.2f, 0f, 1.2f).length());
 		slideTicks = 0;
 	}

@@ -8,6 +8,7 @@ import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.entity.feature.FeatureRenderer;
+import net.minecraft.client.render.entity.feature.FeatureRendererContext;
 import net.minecraft.client.render.entity.model.EntityModelLoader;
 import net.minecraft.client.render.entity.model.PlayerEntityModel;
 import net.minecraft.client.render.item.ItemRenderer;
@@ -21,10 +22,10 @@ public class WingsFeature<T extends PlayerEntity, M extends PlayerEntityModel<T>
 	private static final Identifier TEXTURE = new Identifier(Ultracraft.MOD_ID, "textures/entity/wings.png");
 	private final WingsModel<T> wings;
 	
-	public WingsFeature(EntityModelLoader loader)
+	public WingsFeature(FeatureRendererContext<T, M> context,  EntityModelLoader loader)
 	{
-		super(null);
-		wings = new WingsModel<>(loader.getModelPart(UltracraftClient.WINGS_LAYER));
+		super(context);
+		wings = new WingsModel<>(loader.getModelPart(UltracraftClient.WINGS_LAYER), RenderLayer::getEntityCutoutNoCull);
 	}
 	
 	@Override
@@ -33,8 +34,8 @@ public class WingsFeature<T extends PlayerEntity, M extends PlayerEntityModel<T>
 		WingedPlayerEntity winged = ((WingedPlayerEntity)entity);
 		if(winged.isWingsActive())
 		{
-			//this.getContextModel().copyStateTo(this.wings);
-			this.wings.setAngles(entity, limbAngle, limbDistance, animationProgress, headYaw, headPitch, winged);
+			matrices.push();
+			wings.setAngles(entity, limbAngle, limbDistance, animationProgress, headYaw, headPitch, winged);
 			VertexConsumer vertexConsumer = ItemRenderer.getArmorGlintConsumer(vertexConsumers, RenderLayer.getArmorCutoutNoCull(TEXTURE), false, false);
 			if(entity.isSneaking())
 			{
@@ -46,7 +47,8 @@ public class WingsFeature<T extends PlayerEntity, M extends PlayerEntityModel<T>
 				matrices.translate(0f , 13f / 16f, 8f / 16f);
 				matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-45f));
 			}
-			this.wings.render(matrices, vertexConsumer, light, OverlayTexture.DEFAULT_UV, 1f, 1f, 1f, 1f);
+			wings.render(matrices, vertexConsumer, light, OverlayTexture.DEFAULT_UV, 1f, 1f, 1f, 1f);
+			matrices.pop();
 		}
 	}
 }

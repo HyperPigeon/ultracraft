@@ -1,7 +1,9 @@
 package absolutelyaya.ultracraft;
 
 import absolutelyaya.ultracraft.accessor.LivingEntityAccessor;
-import absolutelyaya.ultracraft.registry.BlockTagRegistry;
+import absolutelyaya.ultracraft.entity.AbstractUltraHostileEntity;
+import absolutelyaya.ultracraft.registry.TagRegistry;
+import absolutelyaya.ultracraft.registry.GameruleRegistry;
 import absolutelyaya.ultracraft.registry.PacketRegistry;
 import io.netty.buffer.Unpooled;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -77,13 +79,15 @@ public class ExplosionHandler
 				if((e instanceof LivingEntityAccessor living && living.takePunchKnockback()) || e instanceof ProjectileEntity)
 					e.addVelocity(e.getPos().subtract(pos).add(0.0, 1f - normalizedDistance, 0.0).normalize()
 										  .multiply(Math.min(radius * 0.75, 1.75f) * (normalizedDistance == 0f ? 0.75f : Math.min(1.5f - normalizedDistance, 1f))));
-				e.damage(source, MathHelper.lerp(normalizedDistance, damage, Math.max(damage - falloff, 0f)));
+				boolean unUltra = !(e instanceof AbstractUltraHostileEntity);
+				e.damage(source, MathHelper.lerp(normalizedDistance, damage * (unUltra ? 1.5f : 1f), Math.max(damage - falloff, 0f) * (unUltra ? 1.5f : 1f)));
 				if(!(e instanceof PlayerEntity))
 					e.setOnFireFor(10);
 			});
 		}
 		Entity exploder = source.getSource();
-		if(breakBlocks && (exploder instanceof PlayerEntity || world.getGameRules().getBoolean(GameRules.DO_MOB_GRIEFING)))
+		GameRules rules = world.getGameRules();
+		if(breakBlocks && rules.getBoolean(GameruleRegistry.EXPLOSION_DAMAGE) && (exploder instanceof PlayerEntity || rules.getBoolean(GameRules.DO_MOB_GRIEFING)))
 		{
 			BlockPos center = new BlockPos((int)Math.floor(pos.x), (int)Math.floor(pos.y), (int)Math.floor(pos.z));
 			for (int y = (int)(-radius); y <= radius; y++)
@@ -97,7 +101,7 @@ public class ExplosionHandler
 						BlockPos pos1 = new BlockPos(center.getX() + x, center.getY() + y, center.getZ() + z);
 						//explosions with 0 damage can only break fragile blocks, as they don't actually count as explosions
 						//and are used for misc block breaking like the piercer revolvers alt fire
-						if(world.getBlockState(pos1).isIn(damage > 0f ? BlockTagRegistry.EXPLOSION_BREAKABLE : BlockTagRegistry.FRAGILE))
+						if(world.getBlockState(pos1).isIn(damage > 0f ? TagRegistry.EXPLOSION_BREAKABLE : TagRegistry.FRAGILE) && exploder.canModifyAt(world, pos1))
 							world.breakBlock(pos1, true, exploder);
 					}
 				}

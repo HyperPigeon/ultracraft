@@ -18,6 +18,7 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Hand;
 import net.minecraft.util.TypedActionResult;
 import net.minecraft.util.UseAction;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.joml.Vector2i;
 import software.bernie.geckolib.animatable.GeoItem;
@@ -54,11 +55,11 @@ public class PierceRevolverItem extends AbstractWeaponItem implements GeoItem
 	public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand)
 	{
 		ItemStack itemStack = user.getStackInHand(hand);
+		if(hand.equals(Hand.OFF_HAND))
+			return TypedActionResult.fail(itemStack);
 		user.setCurrentHand(hand);
 		if(!world.isClient)
-		{
 			itemStack.getOrCreateNbt().putBoolean("charging", true);
-		}
 		return TypedActionResult.consume(itemStack);
 	}
 	
@@ -97,14 +98,14 @@ public class PierceRevolverItem extends AbstractWeaponItem implements GeoItem
 	}
 	
 	@Override
-	public boolean onPrimaryFire(World world, PlayerEntity user)
+	public boolean onPrimaryFire(World world, PlayerEntity user, Vec3d userVelocity)
 	{
 		GunCooldownManager cdm = ((WingedPlayerEntity)user).getGunCooldownManager();
 		if(cdm.isUsable(this, 0))
 		{
 			if(world.isClient)
 			{
-				super.onPrimaryFire(world, user);
+				super.onPrimaryFire(world, user, userVelocity);
 				return true;
 			}
 			world.playSound(null, user.getBlockPos(), SoundEvents.ENTITY_FIREWORK_ROCKET_BLAST, SoundCategory.PLAYERS, 0.75f,
@@ -138,7 +139,7 @@ public class PierceRevolverItem extends AbstractWeaponItem implements GeoItem
 				player.getItemCooldownManager().set(this, 50);
 			}
 			if(!world.isClient)
-				ServerHitscanHandler.performHitscan(user, (byte)1, 1, 3, true);
+				ServerHitscanHandler.performHitscan(user, (byte)1, 3, 3, true);
 		}
 		else if(!world.isClient && user instanceof PlayerEntity)
 			triggerAnim(user, GeoItem.getOrAssignId(stack, (ServerWorld)world), controllerName, "stop");

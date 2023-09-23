@@ -29,9 +29,7 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -55,9 +53,11 @@ public abstract class PlayerEntityMixin extends LivingEntity implements WingedPl
 	boolean wingsActive, groundPounding, ignoreSlowdown;
 	byte wingState, lastState;
 	float wingAnimTime;
-	int dashingTicks = -2, stamina, wingHintDisplayTicks;
+	int dashingTicks = -2, slamDamageCooldown, stamina, wingHintDisplayTicks;
 	GunCooldownManager gunCDM;
 	Multimap<EntityAttribute, EntityAttributeModifier> curSpeedMod;
+	
+	private final Vec3d[] curWingPose = new Vec3d[] {new Vec3d(0.0f, 0.0f, 0.0f), new Vec3d(0.0f, 0.0f, 0.0f), new Vec3d(0.0f, 0.0f, 0.0f), new Vec3d(0.0f, 0.0f, 0.0f), new Vec3d(0.0f, 0.0f, 0.0f), new Vec3d(0.0f, 0.0f, 0.0f), new Vec3d(0.0f, 0.0f, 0.0f), new Vec3d(0.0f, 0.0f, 0.0f)};
 	
 	protected PlayerEntityMixin(EntityType<? extends LivingEntity> entityType, World world)
 	{
@@ -112,7 +112,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements WingedPl
 	@Inject(method = "damage", at = @At("TAIL"))
 	void afterDamage(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir)
 	{
-		if(wingsActive && !source.isIn(DamageTypeTags.IS_PER_TICK))
+		if(wingsActive && !source.isIn(DamageTypeTags.IS_PER_TICK) && !source.isOf(DamageTypes.OUT_OF_WORLD))
 		{
 			if(source.isOf(DamageSources.GUN) || source.isOf(DamageSources.SHOTGUN))
 				timeUntilRegen = 9;
@@ -138,9 +138,12 @@ public abstract class PlayerEntityMixin extends LivingEntity implements WingedPl
 	@Override
 	public void setWingState(byte state)
 	{
-		lastState = wingState;
-		wingState = state;
-		setWingAnimTime(0);
+		if(wingState != state)
+		{
+			setWingAnimTime(0);
+			lastState = wingState;
+			wingState = state;
+		}
 	}
 	
 	@Override
@@ -156,10 +159,42 @@ public abstract class PlayerEntityMixin extends LivingEntity implements WingedPl
 	}
 	
 	@Override
+	public float getWingAnimTime()
+	{
+		return wingAnimTime;
+	}
+	
+	@Override
+	public void setWingAnimTime(float f)
+	{
+		wingAnimTime = f;
+	}
+	
+	@Override
+	public Vec3d[] getWingPose()
+	{
+		Vec3d[] pose = new Vec3d[8];
+		System.arraycopy(curWingPose, 0, pose, 0, 8);
+		return pose;
+	}
+	
+	@Override
+	public void setWingPose(Vec3d[] pose)
+	{
+		System.arraycopy(pose, 0, curWingPose, 0, 8);
+	}
+	
+	@Override
 	public void onDash()
 	{
 		dashingTicks = 3;
 		world.playSound(null, getBlockPos(), SoundEvents.ENTITY_ENDER_DRAGON_FLAP, SoundCategory.PLAYERS, 0.75f, 1.6f);
+	}
+	
+	@Override
+	public void cancelDash()
+	{
+		dashingTicks = -2;
 	}
 	
 	@Override
@@ -190,18 +225,6 @@ public abstract class PlayerEntityMixin extends LivingEntity implements WingedPl
 	public int getDashingTicks()
 	{
 		return dashingTicks;
-	}
-	
-	@Override
-	public float getWingAnimTime()
-	{
-		return wingAnimTime;
-	}
-	
-	@Override
-	public void setWingAnimTime(float f)
-	{
-		wingAnimTime = f;
 	}
 	
 	@Override
@@ -281,19 +304,22 @@ public abstract class PlayerEntityMixin extends LivingEntity implements WingedPl
 	}
 	
 	@Override
-	public void startGroundPound()
+	public void startSlam()
 	{
 		groundPounding = true;
 	}
 	
 	@Override
-	public void completeGroundPound(boolean strong)
+	public void endSlam(boolean strong)
 	{
 		groundPounding = false;
+		if(!onGround)
+			return;
 		world.playSound(null, getBlockPos(), SoundEvents.ENTITY_GENERIC_EXPLODE, SoundCategory.PLAYERS,
 				strong ? 1f : 0.75f, strong ? 0.75f : 1.25f);
 		world.getOtherEntities(this, getBoundingBox().expand(0f, 1f, 0f).offset(0f, -0.5f, 0f)).forEach(e ->
-				e.damage(DamageSources.get(world, DamageSources.POUND, this), 6));
+				e.damage(DamageSources.get(world, DamageSources.POUND, this), slamDamageCooldown > 0 ? 1 : 6));
+		slamDamageCooldown = 30;
 		if(!strong)
 			return;
 		world.getOtherEntities(this, getBoundingBox().expand(3f, 0.5f, 3f)).forEach(e -> {
@@ -316,6 +342,8 @@ public abstract class PlayerEntityMixin extends LivingEntity implements WingedPl
 			wingHintDisplayTicks--;
 		if(dashingTicks > -60)
 			dashingTicks--;
+		if(slamDamageCooldown > 0)
+			slamDamageCooldown--;
 	}
 	
 	@Inject(method = "tickMovement", at = @At("TAIL"))

@@ -49,7 +49,7 @@
   "entity.ultracraft.shotgun_pellet": "Shotgun Pellet",
   "entity.ultracraft.ejected_core": "Ausgeworfener Kern",
 
-  "death.attack.shockwave": "%1$s wurde von %2$ss Schockwelle zerquetscht",
+  "death.attack.shockwave": "%s wurde von einer Schockwelle zerquetscht",
   "death.attack.shockwave.item": "%1$s wurde von %2$ss Schockwelle zerquetscht",
   "death.attack.maurice": "%1$s wurde Mauriced",
   "death.attack.maurice.player": "%1$s wurde während einer Ablenkung von %2$s Mauriced",
@@ -82,6 +82,10 @@
   "message.ultracraft.hi-vel.enable": "Hochgeschwindigkeits-Flügel aktiviert!",
   "message.ultracraft.hi-vel.disable": "Hochgeschwindigkeits-Flügel deaktiviert!",
   "message.ultracraft.server.freeze-enable-warning": "[§4Ultracraft§r] h-hey, du hast gerade den Zeitstopp Effekt aktiviert! Bitte bedenke dass dieser Effekt §4SERVER WEIT§r ist, also jedes mal wenn die Zeit stoppt betrifft das JEDEN. Wenn du viele Spieler hast, empfehle ich diese Regel deaktiviert zu lassen.",
+  "message.ultracraft.server.projboost-all": "[§4Ultracraft§r] Alle Projektile können nun Projektil-geboosted werden. Das heißt unter anderem Pfeile, Dreizäcke, Enderperlen und sogar Feuerwerksraketen",
+  "message.ultracraft.server.projboost-limited": "[§4Ultracraft§r] Nur das Primär-Feuer von Shotguns kann nun Projektil-geboostet werden.",
+  "message.ultracraft.server.projboost-tag": "[§4Ultracraft§r] Nur Projektile in dem \"projboostable\" Entity Tag können nun Projektil-geboosted werden. (einstellbar über datapacks)",
+  "message.ultracraft.server.projboost-disable": "[§4Ultracraft§r] Projektil-Boosts wurden komplett abgeschaltet.",
   "message.ultracraft.fish.caught": "%s gefangen!",
   "message.ultracraft.fish.size": "Größe: %s",
   "message.ultracraft.fish.disable": "Dieser Witz kann in den Modeinstellungen ausgeschaltet werden",
@@ -91,7 +95,7 @@
   "message.ultracraft.fish.mania4": "DIE GRÖßE 2 IST REAL!!",
   "message.ultracraft.fish.mania5": "...der... \nder ist größer als sonst! \nIch muss nah dran sein!!",
   "message.ultracraft.handswap-disabled": "[§4Ultracraft§r] Dieser Server hat Hand-Quickswapping deaktiviert.",
-  "message.ultracraft.content": "Wilkommen zu Ultracraft!\nDiese Mod soll das Spiel Ultrakill (by §6Arsi \"Hakita\" Patala§f) und dessen Mechaniken in Minecraft nachmachen. Momentaner Inhalt:\n- Alle Prolog Gegner\n- 2 Weapons\n- Ein paar Blöcke und Items\n- Ein paar Geheimnisse/Witze\n\nFalls Leuten die Mod gefällt, werde ich weiter an ihr arbeiten. Das nächste größere Feature das ich implementieren möchte, ist §6Style Punkte§f.\nBitte melde Probleme/Bugs und schicke mir jegliches Feedback das du hast!\nRelevante Links sind in der Modbeschreibung.\n\n✦ Absolutelyaya ✦",
+  "message.ultracraft.content": "Wilkommen zu Ultracraft!\nDiese Mod soll das Spiel Ultrakill (by §6Arsi \"Hakita\" Patala§f) und dessen Mechaniken in Minecraft nachmachen. Momentaner Inhalt:\n- Alle Prolog Gegner\n- 2 Weapons\n- Ein paar Blöcke und Items\n- Ein paar Geheimnisse/Witze\n\nFalls Leuten die Mod gefällt, werde ich weiter an ihr arbeiten. Das nächste nennenswerte Update enthält §6Waffen Varianten§f.\nBitte melde Probleme/Bugs und schicke mir jegliches Feedback das du hast!\nRelevante Links sind in der Modbeschreibung.\n\n✦ Absolutelyaya ✦",
   "message.ultracraft.consent": "Verstanden",
   "message.ultracraft.intro-error": "Es ist etwas mit der Ultracraft Intro Sequenz Falsch gelaufen.\nDas Problem: Manchmal wird der Abschluss des Asset-Reloads nicht richtig kommuniziert.\nZum Glück haben wir einen Knopf der alle Probleme lösen kann!",
   "message.ultracraft.fixer-button": "Problem lösen",
@@ -115,6 +119,7 @@
 
   "text.autoconfig.ultracraft.category.default": "Ultracraft",
   "text.autoconfig.ultracraft.category.blood": "Goop / Blut",
+  "text.autoconfig.ultracraft.category.ultra-hud": "UltraHUD",
   "text.autoconfig.ultracraft.category.debug": "Debug",
 
   "text.autoconfig.ultracraft.option.fancyGoop": "Hübsches Goop",
@@ -137,11 +142,14 @@
   "text.autoconfig.ultracraft.option.ultraHudVisibility.@Tooltip[0]": "Ob das UltraHUD gerendert werden sollte.",
   "text.autoconfig.ultracraft.option.ultraHudVisibility.@Tooltip[1]": "LIMITED = nur im Hochgeschwindigkeits-Modus anzeigen",
 
-  "text.autoconfig.ultracraft.option.ultraHudCrosshair": "UltraHUD Fadenkreuz",
+  "text.autoconfig.ultracraft.option.ultraHudCrosshair": "Fadenkreuz",
   "text.autoconfig.ultracraft.option.ultraHudCrosshair.@Tooltip": "Fügt Lebens- und Energiebalken um dein Fadenkreuz hinzu.",
 
-  "text.autoconfig.ultracraft.option.moveUltrahud": "Ultrahud bewegen",
-  "text.autoconfig.ultracraft.option.moveUltrahud.@Tooltip": "Bewegt das UltraHUD nach oben wenn in der Nebenhand ein Item ist.",
+  "text.autoconfig.ultracraft.option.moveUltrahud": "Bewegen",
+  "text.autoconfig.ultracraft.option.moveUltrahud.@Tooltip": "Bewegt das UltraHUD nach oben wenn ein Item es verdecken würde.",
+
+  "text.autoconfig.ultracraft.option.switchSides": "Seite Wechseln",
+  "text.autoconfig.ultracraft.option.switchSides.@Tooltip": "Bewegt die UltraHUD auf die jeweils andere Seite.",
 
   "text.autoconfig.ultracraft.option.maxTrails": "Maximumale Spuren",
   "text.autoconfig.ultracraft.option.maxTrails.@Tooltip": "Begrenzt die menge an Spuren durch diesen Wert.",
@@ -152,6 +160,9 @@
   "text.autoconfig.ultracraft.option.slideCamOffset": "Rutsch-Kamera-Offset Prozent",
   "text.autoconfig.ultracraft.option.slideCamOffset.@Tooltip": "Wie sehr die third person Kamera verschoben wird beim rutschen.",
 
+  "text.autoconfig.ultracraft.option.slideTilt": "Rutsch-Kamera-Neigungs Winkel",
+  "text.autoconfig.ultracraft.option.slideTilt.@Tooltip": "Um wie viel grad die Kamera sich Neigen sollte beim Lenken der Rutsch-Richtung",
+
   "text.autoconfig.ultracraft.option.trailParticles": "Spuren als Partikel",
   "text.autoconfig.ultracraft.option.trailParticles.@Tooltip[0]": "Rendert Spuren als Partikel anstelle von dem Spur-renderer.",
   "text.autoconfig.ultracraft.option.trailParticles.@Tooltip[1]": "Ausschalten führt zu Transparenz Überlagerungs Fehlern!",
@@ -161,6 +172,12 @@
 
   "text.autoconfig.ultracraft.option.danganronpa": "Blut Zensieren",
   "text.autoconfig.ultracraft.option.danganronpa.@Tooltip": "Färbt alle Blut-Effekte Neon Pink.",
+
+  "text.autoconfig.ultracraft.option.showPunchArea": "Parrier-Box anzeigen",
+  "text.autoconfig.ultracraft.option.showPunchArea.@Tooltip": "Spawnt Partikel in den Ecken der Parrier Check Box.",
+
+  "text.autoconfig.ultracraft.option.movementSounds": "Bewegungs Geräusche",
+  "text.autoconfig.ultracraft.option.movementSounds.@Tooltip": "Ob Rutschen und sonstige schnelle Bewegungen ihren Sound Loop spielen sollten.",
 
   "text.autoconfig.ultracraft.option.repeatIntro": "Intro wiederholen"
 }

@@ -5,13 +5,17 @@ import absolutelyaya.ultracraft.damage.DamageSources;
 import absolutelyaya.ultracraft.registry.PacketRegistry;
 import io.netty.buffer.Unpooled;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.block.BellBlock;
+import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.ProjectileEntity;
 import net.minecraft.entity.projectile.ProjectileUtil;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.Arm;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.hit.HitResult;
@@ -63,7 +67,7 @@ public class ServerHitscanHandler
 	public static void performHitscan(LivingEntity user, byte type, float damage, int maxHits, @Nullable HitscanExplosionData explosion)
 	{
 		World world = user.getWorld();
-		Vec3d origin = user.getPos().add(new Vec3d(0f, user.getStandingEyeHeight(), 0f));
+		Vec3d origin = user.getEyePos();
 		Vec3d from = origin;
 		Vec3d origunalTo = user.getPos().add(0f, user.getStandingEyeHeight(), 0f).add(user.getRotationVec(0.5f).multiply(64.0));
 		Vec3d modifiedTo;
@@ -93,9 +97,18 @@ public class ServerHitscanHandler
 		}
 		entities.forEach(e -> e.damage(DamageSources.get(world, DamageSources.GUN, user), damage));
 		if(explosion != null)
-			ExplosionHandler.explosion(null, world, new Vec3d(modifiedTo.x, modifiedTo.y, modifiedTo.z), world.getDamageSources().explosion(null, user),
+			ExplosionHandler.explosion(null, world, new Vec3d(modifiedTo.x, modifiedTo.y, modifiedTo.z), world.getDamageSources().explosion(user, user),
 					explosion.damage, explosion.falloff, explosion.radius, explosion.breakBlocks);
-		sendPacket((ServerWorld)user.world, origin.add(new Vec3d(-0.5f, -0.3f, 0f).rotateY(-(float)Math.toRadians(user.getYaw()))), modifiedTo, type);
+		if(entities.size() == 0 && user instanceof PlayerEntity p)
+		{
+			BlockState state = world.getBlockState(bHit.getBlockPos());
+			if(state.getBlock() instanceof BellBlock bell)
+				bell.ring(world, state, bHit, p, false);
+			
+		}
+		sendPacket((ServerWorld)user.world, origin.add(
+				new Vec3d(-0.5f * (user instanceof PlayerEntity player && player.getMainArm().equals(Arm.LEFT) ? -1 : 1), -0.2f, 0.4f)
+						.rotateY(-(float)Math.toRadians(user.getYaw()))), modifiedTo, type);
 	}
 	
 	public record HitscanExplosionData(float radius, float damage, float falloff, boolean breakBlocks) {}

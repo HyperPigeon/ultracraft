@@ -52,14 +52,20 @@ import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandlerRegistry
 import net.fabricmc.fabric.api.client.render.fluid.v1.SimpleFluidRenderHandler;
 import net.fabricmc.fabric.api.client.rendering.v1.*;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.particle.WaterBubbleParticle;
+import net.minecraft.client.particle.WaterSplashParticle;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.block.entity.BlockEntityRendererFactories;
+import net.minecraft.client.render.entity.PlayerEntityRenderer;
 import net.minecraft.client.render.entity.model.EntityModelLayer;
+import net.minecraft.client.sound.SoundManager;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.World;
 import software.bernie.geckolib.network.GeckoLibNetwork;
 
 @Environment(EnvType.CLIENT)
@@ -72,13 +78,13 @@ public class UltracraftClient implements ClientModInitializer
 	public static final EntityModelLayer INTERRUPTABLE_CHARGE_LAYER = new EntityModelLayer(new Identifier(Ultracraft.MOD_ID, "interruptable_charge"), "main");
 	public static ClientHitscanHandler HITSCAN_HANDLER;
 	public static TrailRenderer TRAIL_RENDERER;
-	public static boolean REPLACE_MENU_MUSIC = true;
+	public static boolean REPLACE_MENU_MUSIC = true, applyEntityPoses;
 	static boolean HiVelMode = false;
 	static GameruleRegistry.Option HiVelOption = GameruleRegistry.Option.FREE;
 	static GameruleRegistry.Option TimeFreezeOption = GameruleRegistry.Option.FORCE_ON;
 	static GameruleRegistry.RegenOption BloodRegen = GameruleRegistry.RegenOption.ALWAYS;
-	static boolean disableHandswap = false, slamStorage = true, fallDamage = false, drowning = false;
-	public static int jumpBoost, speed;
+	static boolean disableHandswap = false, slamStorage = true, fallDamage = false, drowning = false, effectivelyViolent = false, wasMovementSoundsEnabled;
+	public static int jumpBoost, speed, gravityReduction;
 	static float screenblood;
 	
 	static UltraHudRenderer hudRenderer;
@@ -111,6 +117,9 @@ public class UltracraftClient implements ClientModInitializer
 		particleRegistry.register(ParticleRegistry.SLIDE, SlideParticle.SlideParticleFactory::new);
 		particleRegistry.register(ParticleRegistry.GROUND_POUND, GroundPoundParticle.GroundPoundParticleFactory::new);
 		particleRegistry.register(ParticleRegistry.EJECTED_CORE_FLASH, EjectedCoreFlashParticle.EjectedCoreFlashParticleFactory::new);
+		particleRegistry.register(ParticleRegistry.BLOOD_SPLASH, WaterSplashParticle.Factory::new);
+		particleRegistry.register(ParticleRegistry.BLOOD_BUBBLE, WaterBubbleParticle.Factory::new);
+		particleRegistry.register(ParticleRegistry.RIPPLE, RippleParticle.RippleFactory::new);
 		particleRegistry.register(ParticleRegistry.PARRY_INDICATOR, ParryIndicatorParticle.ParryIndicatorParticleFactory::new);
 		particleRegistry.register(ParticleRegistry.TELEPORT, TeleportParticle.TeleportParticleFactory::new);
 		particleRegistry.register(ParticleRegistry.GOOP_DROP, GoopDropParticle.GoopDropParticleFactory::new);
@@ -160,14 +169,17 @@ public class UltracraftClient implements ClientModInitializer
 				client.player.sendMessage(Text.translatable("message.ultracraft.join-info"));
 				client.player.sendMessage(Text.translatable("========================================="));
 			}
-			
-			client.getSoundManager().play(new MovingWindSoundInstance(client.player));
 		});
 		
 		ClientEntityEvents.ENTITY_LOAD.register((entity, clientWorld) -> {
 			if (entity instanceof PlayerEntity player)
 			{
-				MinecraftClient.getInstance().getSoundManager().play(new MovingSlideSoundInstance(player));
+				if(config.get().movementSounds && player.getUuid().equals(MinecraftClient.getInstance().player.getUuid()))
+				{
+					SoundManager sound = MinecraftClient.getInstance().getSoundManager();
+					sound.play(new MovingSlideSoundInstance(player));
+					sound.play(new MovingWindSoundInstance(player));
+				}
 				if(player.getUuid().equals(MinecraftClient.getInstance().player.getUuid()))
 					return;
 				PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
@@ -184,12 +196,15 @@ public class UltracraftClient implements ClientModInitializer
 			if(type.equals(EntityRegistry.MALICIOUS_FACE))
 				helper.register(new EnragedFeature<>(context.getModelLoader()));
 			if(type.equals(EntityType.PLAYER))
-				helper.register(new WingsFeature<>(context.getModelLoader()));
+				helper.register(new WingsFeature<>((PlayerEntityRenderer)renderer, context.getModelLoader()));
 		});
+		
+		WorldRenderEvents.BEFORE_ENTITIES.register((ctx) -> applyEntityPoses = true);
 		
 		WorldRenderEvents.AFTER_ENTITIES.register((ctx) -> {
 			UltracraftClient.HITSCAN_HANDLER.render(ctx.matrixStack(), ctx.camera());
 			UltracraftClient.TRAIL_RENDERER.render(ctx.matrixStack(), ctx.camera());
+			applyEntityPoses = false;
 		});
 		
 		HudRenderCallback.EVENT.register((matrices, delta) -> {
@@ -217,17 +232,28 @@ public class UltracraftClient implements ClientModInitializer
 		ClientTickEvents.END_WORLD_TICK.register(minecraft -> {
 			Ultracraft.tickFreeze();
 			UltracraftClient.TRAIL_RENDERER.tick();
+			if(!wasMovementSoundsEnabled && config.get().movementSounds)
+			{
+				PlayerEntity player = MinecraftClient.getInstance().player;
+				if(player == null)
+					return;
+				SoundManager sound = MinecraftClient.getInstance().getSoundManager();
+				sound.play(new MovingSlideSoundInstance(player));
+				sound.play(new MovingWindSoundInstance(player));
+			}
+			wasMovementSoundsEnabled = config.get().movementSounds;
 		});
 		ClientSendMessageEvents.CHAT.register(message -> {
 			PlayerEntity player = MinecraftClient.getInstance().player;
 			if(player == null)
 				return;
-			player.world.getEntitiesByType(EntityRegistry.FILTH, player.getBoundingBox().expand(128.0), entity -> true)
-					.forEach(FilthEntity::throwback);
+			if(message.equals("Press alt to throw it back"))
+				player.world.getEntitiesByType(EntityRegistry.FILTH, player.getBoundingBox().expand(128.0), entity -> true)
+						.forEach(FilthEntity::throwback);
 		});
 		FluidRenderHandlerRegistry.INSTANCE.register(FluidRegistry.STILL_BLOOD, FluidRegistry.Flowing_BLOOD,
 				new SimpleFluidRenderHandler(new Identifier(Ultracraft.MOD_ID, "block/blood_still"), new Identifier(Ultracraft.MOD_ID, "block/blood_flow")));
-		BlockRenderLayerMap.INSTANCE.putFluids(RenderLayer.getTranslucent(), FluidRegistry.STILL_BLOOD, FluidRegistry.Flowing_BLOOD);
+		BlockRenderLayerMap.INSTANCE.putFluids(RenderLayer.getSolid(), FluidRegistry.STILL_BLOOD, FluidRegistry.Flowing_BLOOD);
 	}
 	
 	public static void addBlood(float f)
@@ -288,6 +314,11 @@ public class UltracraftClient implements ClientModInitializer
 		return slamStorage;
 	}
 	
+	public static boolean isViolentFeaturesEnabled(World world)
+	{
+		return world.getDifficulty() == Difficulty.HARD || effectivelyViolent;
+	}
+	
 	public static void setHighVel(boolean b, boolean fromServer)
 	{
 		PlayerEntity player = MinecraftClient.getInstance().player;
@@ -323,6 +354,7 @@ public class UltracraftClient implements ClientModInitializer
 			case 6 -> fallDamage = value == 1;
 			case 7 -> drowning = value == 1;
 			case 8 -> BloodRegen = GameruleRegistry.RegenOption.values()[value];
+			case 11 -> effectivelyViolent = value == 1;
 			default -> Ultracraft.LOGGER.error("Received invalid Packet data: [rule_syncB] -> " + data);
 		}
 	}
@@ -334,6 +366,7 @@ public class UltracraftClient implements ClientModInitializer
 		{
 			case 4 -> jumpBoost = value;
 			case 9 -> speed = value;
+			case 10 -> gravityReduction = value;
 			default -> Ultracraft.LOGGER.error("Received invalid Packet data: [rule_syncI] -> " + data);
 		}
 	}

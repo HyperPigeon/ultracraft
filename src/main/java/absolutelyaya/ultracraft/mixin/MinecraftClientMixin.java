@@ -64,7 +64,7 @@ public abstract class MinecraftClientMixin
 	@Inject(method = "doAttack", at = @At("HEAD"), cancellable = true)
 	void onDoAttack(CallbackInfoReturnable<Boolean> cir)
 	{
-		if(player == null)
+		if(player == null || player.isSpectator())
 			return;
 		HitResult hit = player.raycast(interactionManager.getReachDistance(), 0f, false);
 		boolean pedestal = hit instanceof BlockHitResult bhit && player.world.getBlockState(bhit.getBlockPos()).isOf(BlockRegistry.PEDESTAL);
@@ -81,8 +81,9 @@ public abstract class MinecraftClientMixin
 				return;
 			}
 			PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
+			buf.writeVector3f(player.getVelocity().toVector3f());
 			ClientPlayNetworking.send(PacketRegistry.PRIMARY_SHOT_PACKET_ID_C2S, buf);
-			w.onPrimaryFire(world, player);
+			w.onPrimaryFire(world, player, player.getVelocity());
 			cir.setReturnValue(false);
 			return;
 		}

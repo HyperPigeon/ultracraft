@@ -7,16 +7,15 @@ import absolutelyaya.ultracraft.accessor.ProjectileEntityAccessor;
 import absolutelyaya.ultracraft.accessor.WingedPlayerEntity;
 import absolutelyaya.ultracraft.block.IPunchableBlock;
 import absolutelyaya.ultracraft.damage.DamageSources;
-import absolutelyaya.ultracraft.entity.projectile.ShotgunPelletEntity;
 import absolutelyaya.ultracraft.item.AbstractWeaponItem;
 import io.netty.buffer.Unpooled;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.block.BellBlock;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.ProjectileEntity;
-import net.minecraft.entity.projectile.thrown.ThrownItemEntity;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -28,6 +27,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import org.joml.Vector3f;
 
 import java.util.List;
 import java.util.UUID;
@@ -41,6 +41,7 @@ public class PacketRegistry
 	public static final Identifier DASH_C2S_PACKET_ID = new Identifier(Ultracraft.MOD_ID, "dash_c2s");
 	public static final Identifier GROUND_POUND_C2S_PACKET_ID = new Identifier(Ultracraft.MOD_ID, "ground_pound_c2s");
 	public static final Identifier REQUEST_HIVEL_PACKET_ID = new Identifier(Ultracraft.MOD_ID, "request_hivel");
+	public static final Identifier SKIM_C2S_PACKET_ID = new Identifier(Ultracraft.MOD_ID, "skim_c2s");
 	
 	public static final Identifier FREEZE_PACKET_ID = new Identifier(Ultracraft.MOD_ID, "freeze");
 	public static final Identifier HITSCAN_PACKET_ID = new Identifier(Ultracraft.MOD_ID, "hitscan");
@@ -53,7 +54,9 @@ public class PacketRegistry
 	public static final Identifier ENTITY_TRAIL = new Identifier(Ultracraft.MOD_ID, "entity_trail");
 	public static final Identifier GROUND_POUND_S2C_PACKET_ID = new Identifier(Ultracraft.MOD_ID, "ground_pound_s2c");
 	public static final Identifier EXPLOSION_PACKET_ID = new Identifier(Ultracraft.MOD_ID, "explosion");
-	public static final Identifier PRIMARY_SHOT_PACKET_ID_S2C = new Identifier(Ultracraft.MOD_ID, "primary_shot_s2c");
+	public static final Identifier PRIMARY_SHOT_S2C_PACKET_ID = new Identifier(Ultracraft.MOD_ID, "primary_shot_s2c");
+	public static final Identifier DEBUG = new Identifier(Ultracraft.MOD_ID, "debug");
+	public static final Identifier SKIM_S2C_PACKET_ID = new Identifier(Ultracraft.MOD_ID, "skim_s2c");
 	
 	public static void registerC2S()
 	{
@@ -64,21 +67,37 @@ public class PacketRegistry
 				target = world.getEntityById(buf.readInt());
 			else
 				target = null;
+			Vector3f clientVel = buf.readVector3f(); //velocity the player has on the client
+			boolean debug = buf.readBoolean();
 			
 			server.execute(() -> {
 				ProjectileEntity p;
-				Vec3d forward = player.getRotationVector();
-				Vec3d pos = player.getCameraPosVec(0f).add(forward.normalize());
-				List<ProjectileEntity> projectiles = player.world.getEntitiesByClass(ProjectileEntity.class,
-						new Box(pos.x - 0.75f, pos.y - 0.75f, pos.z - 0.75f, pos.x + 0.75f, pos.y + 0.75f, pos.z + 0.75f),
+				Vec3d forward = player.getRotationVector().normalize();
+				Vec3d pos = player.getEyePos();
+				Box check = new Box(pos.x - 0.3f, pos.y - 0.3f, pos.z - 0.3f,
+						pos.x + 0.3f, pos.y + 0.3f, pos.z + 0.3f)
+									.stretch(forward.multiply(0.9)).offset(new Vec3d(clientVel.mul(-0.5f)))
+									.stretch(clientVel.x * 16, clientVel.y * 16, clientVel.z * 16);
+				List<ProjectileEntity> projectiles = player.world.getEntitiesByClass(ProjectileEntity.class, check,
 						(e) -> !((ProjectileEntityAccessor)e).isParried());
+				
+				if(debug) {
+					addDebugParticle(player, new Vec3d(check.minX, check.minY, check.minZ));
+					addDebugParticle(player, new Vec3d(check.maxX, check.minY, check.minZ));
+					addDebugParticle(player, new Vec3d(check.minX, check.minY, check.maxZ));
+					addDebugParticle(player, new Vec3d(check.maxX, check.minY, check.maxZ));
+					addDebugParticle(player, new Vec3d(check.minX, check.maxY, check.minZ));
+					addDebugParticle(player, new Vec3d(check.maxX, check.maxY, check.minZ));
+					addDebugParticle(player, new Vec3d(check.minX, check.maxY, check.maxZ));
+					addDebugParticle(player, new Vec3d(check.maxX, check.maxY, check.maxZ));
+				}
 				
 				player.swingHand(Hand.OFF_HAND, true);
 				
 				//Punch Entity
 				if(target != null)
 				{
-					if(!player.getOffHandStack().isEmpty())
+					if(player.getOffHandStack().isIn(TagRegistry.PUNCH_FLAMES))
 						target.setFireTicks(100);
 					if (target instanceof MeleeInterruptable mp && (!(mp instanceof MobEntity) || ((MobEntity)mp).isAttacking()))
 					{
@@ -107,10 +126,10 @@ public class PacketRegistry
 					return;
 				if(!((ProjectileEntityAccessor)p).isParriable())
 					return;
-				if(player.equals(p.getOwner()) && p instanceof ThrownItemEntity thrown)
+				if(player.equals(p.getOwner()))
 				{
-					if(player.world.getGameRules().getBoolean(GameruleRegistry.ALLOW_PROJ_BOOST_THROWABLE) || thrown instanceof ShotgunPelletEntity)
-						Ultracraft.freeze((ServerWorld) player.world, 5);
+					if(((ProjectileEntityAccessor)p).isBoostable())
+						Ultracraft.freeze((ServerWorld) player.world, 5); //ProjBoost freezes are shorter
 					else
 						return;
 				}
@@ -126,29 +145,31 @@ public class PacketRegistry
 			World world = player.getWorld();
 			BlockPos target = buf.readBlockPos();
 			boolean mainHand = buf.readBoolean();
-			
 			server.execute(() -> {
 				if(target != null)
 				{
 					BlockState state = world.getBlockState(target);
 					if(state.getBlock() instanceof IPunchableBlock punchable)
 						punchable.onPunch(player, target, mainHand);
-					if(state.isIn(BlockTagRegistry.PUNCH_BREAKABLE))
+					if(state.getBlock() instanceof BellBlock bell)
+						bell.ring(player, player.world, target, player.getHorizontalFacing().getOpposite());
+					if(state.isIn(TagRegistry.PUNCH_BREAKABLE) && player.canModifyAt(world, target))
 						player.world.breakBlock(target, true, player);
 				}
 			});
 		});
 		ServerPlayNetworking.registerGlobalReceiver(PRIMARY_SHOT_PACKET_ID_C2S, (server, player, handler, buf, sender) -> {
+			Vec3d velocity = new Vec3d(buf.readVector3f());
 			server.execute(() -> {
 				if (player.getMainHandStack().getItem() instanceof AbstractWeaponItem gun)
 				{
-					if (!gun.onPrimaryFire(player.world, player))
+					if (!gun.onPrimaryFire(player.world, player, velocity))
 						return;
 					for (ServerPlayerEntity p : ((ServerWorld)player.world).getPlayers())
 					{
 						PacketByteBuf cbuf = new PacketByteBuf(Unpooled.buffer());
 						cbuf.writeUuid(player.getUuid());
-						ServerPlayNetworking.send(p, PRIMARY_SHOT_PACKET_ID_S2C, cbuf);
+						ServerPlayNetworking.send(p, PRIMARY_SHOT_S2C_PACKET_ID, cbuf);
 					}
 				}
 				else
@@ -185,9 +206,9 @@ public class PacketRegistry
 			server.execute(() -> {
 				WingedPlayerEntity winged = (WingedPlayerEntity)player;
 				if(start)
-					winged.startGroundPound();
+					winged.startSlam();
 				else
-					winged.completeGroundPound(strong);
+					winged.endSlam(strong);
 				if(start)
 					return;
 				PacketByteBuf cbuf = new PacketByteBuf(Unpooled.buffer());
@@ -208,6 +229,21 @@ public class PacketRegistry
 			buf.writeBoolean(((WingedPlayerEntity)target).isWingsActive());
 			ServerPlayNetworking.send(player, SET_HIGH_VELOCITY_S2C_PACKET_ID, buf);
 		});
+		ServerPlayNetworking.registerGlobalReceiver(SKIM_C2S_PACKET_ID, (server, player, handler, buf, sender) -> {
+			if(player == null)
+				return;
+			Vec3d pos = new Vec3d(buf.readVector3f());
+			PacketByteBuf cbuf = new PacketByteBuf(Unpooled.buffer());
+			cbuf.writeVector3f(pos.toVector3f());
+			player.world.getPlayers().forEach(p -> {
+				if(player.squaredDistanceTo(p) < 32f * 32f)
+					ServerPlayNetworking.send((ServerPlayerEntity)p, SKIM_S2C_PACKET_ID, cbuf);
+			});
+			server.execute(() -> {
+				player.playSound(SoundEvents.ENTITY_SALMON_FLOP, SoundCategory.PLAYERS, 1f, 0.8f + player.getRandom().nextFloat() * 0.4f);
+				player.world.addParticle(ParticleRegistry.RIPPLE, pos.x, pos.y, pos.z, 0, 0, 0);
+			});
+		});
 	}
 	
 	static ProjectileEntity getNearestProjectile(List<ProjectileEntity> projectiles, Vec3d to)
@@ -225,5 +261,12 @@ public class PacketRegistry
 			}
 		}
 		return nearest;
+	}
+	
+	static void addDebugParticle(ServerPlayerEntity p, Vec3d pos)
+	{
+		PacketByteBuf buf = new PacketByteBuf(Unpooled.buffer());
+		buf.writeVector3f(pos.toVector3f());
+		ServerPlayNetworking.send(p, DEBUG, buf);
 	}
 }

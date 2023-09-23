@@ -122,7 +122,7 @@ public class ClientPacketRegistry
 		}));
 		ClientPlayNetworking.registerGlobalReceiver(PacketRegistry.SYNC_RULE, ((client, handler, buf, sender) -> {
 			byte b = buf.readByte();
-			if(b == 40 || b == 90)
+			if(b == 40 || b == 90 || b == 100)
 				UltracraftClient.syncGameRule(b, buf.readInt());
 			else
 				UltracraftClient.syncGameRule(b);
@@ -176,16 +176,31 @@ public class ClientPacketRegistry
 						pos, radius);
 			});
 		})));
-		ClientPlayNetworking.registerGlobalReceiver(PacketRegistry.PRIMARY_SHOT_PACKET_ID_S2C, ((client, handler, buf, sender) -> {
+		ClientPlayNetworking.registerGlobalReceiver(PacketRegistry.PRIMARY_SHOT_S2C_PACKET_ID, ((client, handler, buf, sender) -> {
 			if(client.player == null)
 				return;
 			PlayerEntity player = client.player.world.getPlayerByUuid(buf.readUuid());
 			if(player == null)
 				return;
+			Vec3d velocity = player.getVelocity();
 			MinecraftClient.getInstance().execute(() -> {
 				if(player.getMainHandStack().getItem() instanceof AbstractWeaponItem gun)
-					gun.onPrimaryFire(player.world, player);
+					gun.onPrimaryFire(player.world, player, velocity);
 			});
+		}));
+		ClientPlayNetworking.registerGlobalReceiver(PacketRegistry.DEBUG, ((client, handler, buf, sender) -> {
+			if(client.player == null)
+				return;
+			Vector3f pos = buf.readVector3f();
+			MinecraftClient.getInstance().execute(() -> {
+				client.player.world.addParticle(ParticleTypes.FLAME, pos.x, pos.y, pos.z, 0f, 0f, 0f);;
+			});
+		}));
+		ClientPlayNetworking.registerGlobalReceiver(PacketRegistry.SKIM_S2C_PACKET_ID, ((client, handler, buf, sender) -> {
+			if(client.player == null)
+				return;
+			Vec3d pos = new Vec3d(buf.readVector3f());
+			MinecraftClient.getInstance().execute(() -> client.player.world.addParticle(ParticleRegistry.RIPPLE, pos.x, pos.y, pos.z, 0, 0, 0));
 		}));
 	}
 }

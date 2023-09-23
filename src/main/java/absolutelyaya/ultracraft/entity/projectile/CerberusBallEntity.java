@@ -6,7 +6,6 @@ import absolutelyaya.ultracraft.registry.EntityRegistry;
 import absolutelyaya.ultracraft.registry.ItemRegistry;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.thrown.ThrownItemEntity;
 import net.minecraft.item.Item;
 import net.minecraft.util.hit.HitResult;
@@ -40,35 +39,5 @@ public class CerberusBallEntity extends HellBulletEntity implements ProjectileEn
 	protected Item getDefaultItem()
 	{
 		return ItemRegistry.CERBERUS_BALL;
-	}
-	
-	@Override
-	public void setParried(boolean val, PlayerEntity parrier)
-	{
-	
-	}
-	
-	@Override
-	public boolean isParried()
-	{
-		return false;
-	}
-	
-	@Override
-	public boolean isParriable()
-	{
-		return false;
-	}
-	
-	@Override
-	public void onParriedCollision(HitResult hitResult)
-	{
-	
-	}
-	
-	@Override
-	public boolean isHitscanHittable()
-	{
-		return false;
 	}
 }

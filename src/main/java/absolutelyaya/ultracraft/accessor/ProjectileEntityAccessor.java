@@ -14,4 +14,10 @@ public interface ProjectileEntityAccessor
 	void onParriedCollision(HitResult hitResult);
 	
 	boolean isHitscanHittable();
+	
+	boolean isBoostable();
+	
+	PlayerEntity getParrier();
+	
+	void setParrier(PlayerEntity p);
 }

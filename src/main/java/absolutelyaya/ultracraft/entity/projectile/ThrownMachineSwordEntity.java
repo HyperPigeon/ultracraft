@@ -6,6 +6,7 @@ import absolutelyaya.ultracraft.client.UltracraftClient;
 import absolutelyaya.ultracraft.entity.machine.SwordsmachineEntity;
 import absolutelyaya.ultracraft.damage.DamageSources;
 import absolutelyaya.ultracraft.registry.EntityRegistry;
+import absolutelyaya.ultracraft.registry.GameruleRegistry;
 import absolutelyaya.ultracraft.registry.ItemRegistry;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
@@ -89,16 +90,16 @@ public class 	ThrownMachineSwordEntity extends PersistentProjectileEntity implem
 	@Override
 	public void tick()
 	{
+		if(world.isClient && age == 1)
+			UltracraftClient.TRAIL_RENDERER.createTrail(uuid,
+					() -> {
+						float deg = (float)Math.toRadians(getYaw() + 90);
+						Vector3f left =	getTrailPos(deg, 1.5f);
+						Vector3f right = getTrailPos(deg, 1f);
+						return new Pair<>(left, right);
+					}, new Vector4f(1f, 0.5f, 0f, 0.6f), 30);
 		if(world.isClient && Ultracraft.isTimeFrozen())
 			return;
-		if(world.isClient && age == 1)
-				UltracraftClient.TRAIL_RENDERER.createTrail(uuid,
-				() -> {
-					float deg = (float)Math.toRadians(getYaw() + 90);
-					Vector3f left =	getTrailPos(deg, 1.5f);
-					Vector3f right = getTrailPos(deg, 1f);
-					return new Pair<>(left, right);
-				}, new Vector4f(1f, 0.5f, 0f, 0.6f), 30);
 		move(MovementType.SELF, getVelocity());
 		
 		HitResult hitResult = ProjectileUtil.getCollision(this, this::canHit);
@@ -125,16 +126,10 @@ public class 	ThrownMachineSwordEntity extends PersistentProjectileEntity implem
 	}
 	
 	@Override
-	protected void onBlockCollision(BlockState state)
-	{
-		if(!state.isAir() && !dataTracker.get(RETURNING))
-			dataTracker.set(DISTANCE, 0f);
-	}
-	
-	@Override
 	protected void onBlockHit(BlockHitResult blockHitResult)
 	{
-	
+		if(!dataTracker.get(RETURNING))
+			dataTracker.set(DISTANCE, 0f);
 	}
 	
 	@Override
@@ -170,12 +165,13 @@ public class 	ThrownMachineSwordEntity extends PersistentProjectileEntity implem
 					if(isParried())
 					{
 						sm.onInterrupt(parrier);
-						sm.damage(DamageSources.get(world, DamageSources.PARRY, parrier), 12);
+						sm.damage(DamageSources.get(world, DamageSources.PARRY, parrier), 30);
 					}
 				}
 				if(getOwner() instanceof PlayerEntity p && tryPickup(p))
 				{
-					p.giveItemStack(dataTracker.get(SWORD));
+					if(!p.giveItemStack(dataTracker.get(SWORD)))
+						dropStack(asItemStack());
 					if(isParried())
 						p.damage(DamageSources.get(world, DamageSources.PARRY, parrier), 12);
 				}
@@ -266,9 +262,12 @@ public class 	ThrownMachineSwordEntity extends PersistentProjectileEntity implem
 	@Override
 	public void setParried(boolean val, PlayerEntity parrier)
 	{
-		dataTracker.set(RETURNING, true);
 		if(parrier != getOwner())
-			this.parrier = parrier;
+		{
+			dataTracker.set(RETURNING, true);
+			if(age > 4)
+				this.parrier = parrier;
+		}
 	}
 	
 	@Override
@@ -284,9 +283,21 @@ public class 	ThrownMachineSwordEntity extends PersistentProjectileEntity implem
 	}
 	
 	@Override
+	public boolean isBoostable()
+	{
+		return switch(world.getGameRules().get(GameruleRegistry.PROJ_BOOST).get())
+		{
+			case ALLOW_ALL -> true;
+			case ENTITY_TAG -> getType().isIn(EntityRegistry.PROJBOOSTABLE);
+			case LIMITED -> (Object) this instanceof ShotgunPelletEntity;
+			case DISALLOW -> false;
+		} && age < 4;
+	}
+	
+	@Override
 	public void onParriedCollision(HitResult hitResult)
 	{
-		//since this entity is decarded upon reaching it's owner, the actual parry collision behavior is up in the move method
+		//since this entity is discarded upon reaching it's owner, the actual parry collision behavior is up in the move method
 	}
 	
 	@Override
@@ -301,5 +312,17 @@ public class 	ThrownMachineSwordEntity extends PersistentProjectileEntity implem
 		super.onRemoved();
 		if(world.isClient)
 			UltracraftClient.TRAIL_RENDERER.removeTrail(uuid);
+	}
+	
+	@Override
+	public PlayerEntity getParrier()
+	{
+		return parrier;
+	}
+	
+	@Override
+	public void setParrier(PlayerEntity parrier)
+	{
+		this.parrier = parrier;
 	}
 }
